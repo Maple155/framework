@@ -8,7 +8,7 @@ set BUILD_DIR=build
 set SRC_DIR=src
 set SERVLET_API_JAR=C:\Program Files\Apache Software Foundation\Tomcat 10.1\lib\servlet-api.jar
 set JAR_NAME=framework.jar
-set DEPLOY_DIR=D:\IT.University\S5\Mr_Naina\test\src\main\webapp\WEB-INF\lib
+set DEPLOY_DIR=D:\IT.University\S5\Mr_Naina\framework_test\src\main\webapp\WEB-INF\lib
 
 echo ======================================
 echo Déploiement de projet Java (.jar)

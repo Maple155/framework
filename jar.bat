@@ -9,6 +9,7 @@ set SRC_DIR=src
 set SERVLET_API_JAR=C:\Program Files\Apache Software Foundation\Tomcat 10.1\lib\servlet-api.jar
 set JAR_NAME=framework.jar
 set DEPLOY_DIR=D:\IT.University\S5\Mr_Naina\framework_test\src\main\webapp\WEB-INF\lib
+set LIB_DIR=D:\IT.University\S5\Mr_Naina\framework_test\lib
 
 echo ======================================
 echo Déploiement de projet Java (.jar)
@@ -51,9 +52,13 @@ echo Déploiement du fichier "%JAR_NAME%" vers "%DEPLOY_DIR%"...
 if not exist "%DEPLOY_DIR%" mkdir "%DEPLOY_DIR%"
 copy "%BUILD_DIR%\%JAR_NAME%" "%DEPLOY_DIR%"
 
+if not exist "%LIB_DIR%" mkdir "%LIB_DIR%"
+copy "%BUILD_DIR%\%JAR_NAME%" "%LIB_DIR%"
+
 :: ===== Étape 5 - Terminé =====
 echo ======================================
 echo Déploiement terminé avec succès !
 echo Le fichier .jar a été copié dans "%DEPLOY_DIR%".
+echo Et aussi dans "%LIB_DIR%".
 echo ======================================
 pause

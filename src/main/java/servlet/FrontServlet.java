@@ -1,12 +1,12 @@
 package servlet;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import service.*;
 import annotation.*;
 import jakarta.servlet.RequestDispatcher;
@@ -21,7 +21,6 @@ public class FrontServlet extends HttpServlet {
     public void init() throws ServletException {
         urlMap = new HashMap<>();
         try {
-
             ScanController scanController = new ScanController();
             List<Class<?>> classAnnotated = ScanController.findAllClassesWithAnnotation(getServletContext(),
                     Controller.class);
@@ -34,7 +33,6 @@ public class FrontServlet extends HttpServlet {
                     urlMap.put(method.getURL(), method);
                 }
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -56,22 +54,48 @@ public class FrontServlet extends HttpServlet {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         response.setContentType("text/html;charset=UTF-8");
 
-        if (urlMap.containsKey(path)) {
-            UrlInfo urlInfo = urlMap.get(path);
+        UrlMatcher.MatchResult matchResult = UrlMatcher.findMatch(path, urlMap);
+        
+        if (matchResult != null) {
+            UrlInfo urlInfo = matchResult.getUrlInfo();
             Method urlMethod = urlInfo.getMethod();
+            Map<String, String> urlParameters = matchResult.getParameters();
 
             try {
                 Class<?> controllerClass = Class.forName(urlInfo.getClassName());
                 Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
 
+                if (!urlParameters.isEmpty()) {
+                    response.getWriter().println("<h3>Paramètres extraits de l'URL :</h3>");
+                    response.getWriter().println("<ul>");
+                    for (Map.Entry<String, String> param : urlParameters.entrySet()) {
+                        response.getWriter().println("<li><strong>" + param.getKey() + "</strong> = " + param.getValue() + "</li>");
+                    }
+                    response.getWriter().println("</ul>");
+                    response.getWriter().println("<hr>");
+                }
+
                 Object result = urlMethod.invoke(controllerInstance);
 
                 if (result instanceof String) {
-                    response.getWriter().println(result);
+                    response.getWriter().println("<h3>Résultat de la méthode :</h3>");
+                    response.getWriter().println("<p>" + result + "</p>");
                 } else if (result instanceof ModelView) {
                     ModelView mv = (ModelView) result;
 
                     if (mv.getView() != null) {
+                        Map<String, Object> data = mv.getData();
+                        
+                        if (data != null) {
+                            for (Map.Entry<String, Object> entry : data.entrySet()) {
+                                String key = entry.getKey();
+                                Object value = entry.getValue();
+                                if (key != null && value != null) {
+                                    request.setAttribute(key, value);
+                                }
+                            }
+                        }
+                        
                         RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/" + mv.getView());
                         dispatcher.forward(request, response);
                         return;
@@ -112,5 +136,4 @@ public class FrontServlet extends HttpServlet {
 
         response.getWriter().println("</body></html>");
     }
-
 }

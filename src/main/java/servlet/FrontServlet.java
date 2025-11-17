@@ -7,6 +7,8 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
 import service.*;
 import annotation.*;
 import jakarta.servlet.RequestDispatcher;
@@ -72,6 +74,18 @@ public class FrontServlet extends HttpServlet {
                     ModelView mv = (ModelView) result;
 
                     if (mv.getView() != null) {
+                        Map<String, Object> data = mv.getData();
+                        
+                        if (data != null) {
+                            for (Map.Entry<String, Object> entry : data.entrySet()) {
+                                String key = entry.getKey();
+                                Object value = entry.getValue();
+                                if (key != null && value != null) {
+                                    request.setAttribute(key, value);
+                                }
+                            }
+                        }
+                        
                         RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/" + mv.getView());
                         dispatcher.forward(request, response);
                         return;

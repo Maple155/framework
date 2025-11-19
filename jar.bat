@@ -32,7 +32,7 @@ echo Compilation des fichiers Java...
 (for /r "%SRC_DIR%" %%f in (*.java) do @echo %%~sf) > sources.txt
 
 :: Compilation
-javac -cp "%SERVLET_API_JAR%" -d "%BUILD_DIR%" @sources.txt
+javac -parameters -cp "%SERVLET_API_JAR%" -d "%BUILD_DIR%" @sources.txt
 if errorlevel 1 (
     echo Erreur lors de la compilation. Vérifiez vos fichiers Java.
     del sources.txt

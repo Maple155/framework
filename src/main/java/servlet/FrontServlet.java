@@ -2,6 +2,7 @@ package servlet;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +49,16 @@ public class FrontServlet extends HttpServlet {
         }
     }
 
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        try {
+            findRessource(request, response);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private void findRessource(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
@@ -65,17 +76,9 @@ public class FrontServlet extends HttpServlet {
                 Class<?> controllerClass = Class.forName(urlInfo.getClassName());
                 Object controllerInstance = controllerClass.getDeclaredConstructor().newInstance();
 
-                if (!urlParameters.isEmpty()) {
-                    response.getWriter().println("<h3>Paramètres extraits de l'URL :</h3>");
-                    response.getWriter().println("<ul>");
-                    for (Map.Entry<String, String> param : urlParameters.entrySet()) {
-                        response.getWriter().println("<li><strong>" + param.getKey() + "</strong> = " + param.getValue() + "</li>");
-                    }
-                    response.getWriter().println("</ul>");
-                    response.getWriter().println("<hr>");
-                }
+                Object[] methodArgs = prepareMethodArguments(urlMethod, request, urlParameters);
 
-                Object result = urlMethod.invoke(controllerInstance);
+                Object result = urlMethod.invoke(controllerInstance, methodArgs);
 
                 if (result instanceof String) {
                     response.getWriter().println("<h3>Résultat de la méthode :</h3>");
@@ -135,5 +138,85 @@ public class FrontServlet extends HttpServlet {
         }
 
         response.getWriter().println("</body></html>");
+    }
+
+    private Object[] prepareMethodArguments(Method method, HttpServletRequest request, Map<String, String> urlParameters) {
+        Parameter[] parameters = method.getParameters();
+        Object[] args = new Object[parameters.length];
+        
+        for (int i = 0; i < parameters.length; i++) {
+            Parameter param = parameters[i];
+            String paramName = getParameterName(param);
+            String paramValue = getParameterValue(paramName, request, urlParameters);
+            
+            if (param.getType() == Object.class) {
+                args[i] = paramValue;
+            } else {
+                args[i] = convertValue(paramValue, param.getType());
+            }
+        }
+        
+        return args;
+    }
+
+    private String getParameterName(Parameter parameter) {
+        if (parameter.isAnnotationPresent(Param.class)) {
+            Param paramAnnotation = parameter.getAnnotation(Param.class);
+            String annotationValue = paramAnnotation.value();
+            if (!annotationValue.isEmpty()) {
+                return annotationValue;
+            }
+        }
+        
+        String name = parameter.getName();
+                
+        return name;
+    }
+
+    private String getParameterValue(String paramName, HttpServletRequest request, Map<String, String> urlParameters) {
+        String value = urlParameters.get(paramName);
+        
+        if (value == null) {
+            value = request.getParameter(paramName);
+        }
+        
+        return value;
+    }
+
+    private Object convertValue(String value, Class<?> targetType) {
+        if (value == null) {
+            return getDefaultValue(targetType);
+        }
+        
+        try {
+            if (targetType == String.class) {
+                return value;
+            } else if (targetType == int.class || targetType == Integer.class) {
+                return Integer.parseInt(value);
+            } else if (targetType == long.class || targetType == Long.class) {
+                return Long.parseLong(value);
+            } else if (targetType == double.class || targetType == Double.class) {
+                return Double.parseDouble(value);
+            } else if (targetType == float.class || targetType == Float.class) {
+                return Float.parseFloat(value);
+            } else if (targetType == boolean.class || targetType == Boolean.class) {
+                return Boolean.parseBoolean(value);
+            } else if (targetType == Object.class) {
+                return value;
+            }
+        } catch (NumberFormatException e) {
+            return getDefaultValue(targetType);
+        }
+        
+        return getDefaultValue(targetType);
+    }
+
+    private Object getDefaultValue(Class<?> type) {
+        if (type == int.class) return 0;
+        if (type == long.class) return 0L;
+        if (type == double.class) return 0.0;
+        if (type == float.class) return 0.0f;
+        if (type == boolean.class) return false;
+        return null;
     }
 }

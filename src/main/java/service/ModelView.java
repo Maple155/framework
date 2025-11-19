@@ -7,7 +7,7 @@ public class ModelView {
     String view;
     Map<String, Object> data = new HashMap<>();
 
-    // String six = "6";
+    String six = "6";
 
     public ModelView() {
     }

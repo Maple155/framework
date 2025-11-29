@@ -22,16 +22,15 @@ public class FrontServlet extends HttpServlet {
     public void init() throws ServletException {
         urlMap = new HashMap<>();
         try {
-            ScanController scanController = new ScanController();
+            // ScanController scanController = new ScanController();
             List<Class<?>> classAnnotated = ScanController.findAllClassesWithAnnotation(getServletContext(),
                     Controller.class);
 
             for (Class<?> clazz : classAnnotated) {
                 List<UrlInfo> methods = Utils.findMethodsAnnotatedWithGetUrl(clazz);
 
-                for (UrlInfo method : methods) {
-                    method.setClassName(clazz.getName());
-                    urlMap.put(method.getURL(), method);
+                for (UrlInfo urlInfo : methods) {
+                    urlMap.put(urlInfo.getURL(), urlInfo);
                 }
             }
         } catch (Exception e) {
@@ -43,7 +42,7 @@ public class FrontServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         try {
-            findRessource(request, response);
+            findRessource(request, response, "GET");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -53,13 +52,13 @@ public class FrontServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         try {
-            findRessource(request, response);
+            findRessource(request, response, "POST");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void findRessource(HttpServletRequest request, HttpServletResponse response)
+    private void findRessource(HttpServletRequest request, HttpServletResponse response, String httpMethod)
             throws ServletException, IOException {
 
         String path = request.getRequestURI().substring(request.getContextPath().length());
@@ -69,8 +68,19 @@ public class FrontServlet extends HttpServlet {
         
         if (matchResult != null) {
             UrlInfo urlInfo = matchResult.getUrlInfo();
-            Method urlMethod = urlInfo.getMethod();
             Map<String, String> urlParameters = matchResult.getParameters();
+
+            // Récupérer la méthode correspondant au type HTTP
+            Method urlMethod = urlInfo.getMethod(httpMethod);
+            
+            if (urlMethod == null) {
+                response.getWriter().println("<!DOCTYPE html><html><body>");
+                response.getWriter().println("<h1>Erreur 405 - Méthode non autorisée</h1>");
+                response.getWriter().println("<p>La méthode HTTP " + httpMethod + " n'est pas supportée pour l'URL : " + path + "</p>");
+                response.getWriter().println("<p>Méthodes disponibles pour cette URL : " + urlInfo.getMethods().keySet() + "</p>");
+                response.getWriter().println("</body></html>");
+                return;
+            }
 
             try {
                 Class<?> controllerClass = Class.forName(urlInfo.getClassName());
@@ -80,10 +90,7 @@ public class FrontServlet extends HttpServlet {
 
                 Object result = urlMethod.invoke(controllerInstance, methodArgs);
 
-                if (result instanceof String) {
-                    response.getWriter().println("<h3>Résultat de la méthode :</h3>");
-                    response.getWriter().println("<p>" + result + "</p>");
-                } else if (result instanceof ModelView) {
+                if (result instanceof ModelView) {
                     ModelView mv = (ModelView) result;
 
                     if (mv.getView() != null) {
@@ -105,6 +112,9 @@ public class FrontServlet extends HttpServlet {
                     } else {
                         response.getWriter().println("Aucune vue spécifiée dans ModelView !");
                     }
+                } else {
+                    response.getWriter().println("<h3>Résultat de la méthode (" + httpMethod + ") :</h3>");
+                    response.getWriter().println("<p>" + result.toString() + "</p>");
                 }
 
             } catch (Exception e) {
@@ -131,8 +141,13 @@ public class FrontServlet extends HttpServlet {
             response.getWriter().println("<h2>URLs disponibles :</h2><ul>");
             for (Map.Entry<String, UrlInfo> entry : urlMap.entrySet()) {
                 UrlInfo info = entry.getValue();
-                response.getWriter().println("<li><a href='" + entry.getKey() + "'>" + entry.getKey() + "</a>");
-                response.getWriter().println(" -> " + info.getClassName() + "." + info.getMethod().getName() + "</li>");
+                response.getWriter().println("<li><strong>" + entry.getKey() + "</strong>");
+                response.getWriter().println("<ul>");
+                for (Map.Entry<String, Method> methodEntry : info.getMethods().entrySet()) {
+                    response.getWriter().println("<li>[" + methodEntry.getKey() + "] -> " + 
+                        info.getClassName() + "." + methodEntry.getValue().getName() + "</li>");
+                }
+                response.getWriter().println("</ul></li>");
             }
             response.getWriter().println("</ul>");
         }

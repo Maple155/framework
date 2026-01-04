@@ -33,7 +33,7 @@ public class FileHandler {
                 byte[] fileData = readPartContent(part);
                 filesMap.put(fileName, fileData);
                 
-                System.out.println("Fichier uploadé: " + fileName + " (" + fileData.length + " bytes)");
+                System.out.println("Fichier uploade: " + fileName + " (" + fileData.length + " bytes)");
             }
         }
         
@@ -85,7 +85,7 @@ public class FileHandler {
             fos.write(fileData);
         }
         
-        System.out.println("Fichier sauvegardé: " + file.getAbsolutePath());
+        System.out.println("Fichier sauvegarde: " + file.getAbsolutePath());
     }
     
     /**

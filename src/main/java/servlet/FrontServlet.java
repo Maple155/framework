@@ -123,10 +123,10 @@ public class FrontServlet extends HttpServlet {
                 if (!uploadedFiles.isEmpty()) {
                     String uploadPath = getServletContext().getRealPath("/WEB-INF/uploads");
                     fileHandler.saveAllFiles(uploadPath, uploadedFiles);
-                    System.out.println("Nombre de fichiers uploadés: " + uploadedFiles.size());
+                    System.out.println("Nombre de fichiers uploades: " + uploadedFiles.size());
                 }
             } catch (Exception e) {
-                System.out.println("Aucun fichier uploadé ou erreur: " + e.getMessage());
+                System.out.println("Aucun fichier uploade ou erreur: " + e.getMessage());
             }
 
             Object controllerInstance = createControllerInstance(urlInfo);
@@ -139,7 +139,7 @@ public class FrontServlet extends HttpServlet {
             responseHandler.handleResult(request, response, result, httpMethod, urlMethod);
         } catch (Exception e) {
             e.printStackTrace();
-            responseHandler.sendError(response, "Erreur lors de l'exécution de la méthode", e);
+            responseHandler.sendError(response, "Erreur lors de l'execution de la méthode", e);
         }
     }
 

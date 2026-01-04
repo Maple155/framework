@@ -5,6 +5,7 @@ import java.io.PrintWriter;
 import java.lang.reflect.Method;
 import java.util.Map;
 
+import annotation.JSON;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -14,19 +15,40 @@ import jakarta.servlet.http.HttpServletResponse;
 public class ResponseHandler {
 
     private final HttpServlet servlet;
+    private final JsonConverter jsonConverter;
 
     public ResponseHandler(HttpServlet servlet) {
         this.servlet = servlet;
+        this.jsonConverter = new JsonConverter();
     }
 
-    public void handleResult(HttpServletRequest request, HttpServletResponse response, 
-                           Object result, String httpMethod) 
+    public void handleResult(HttpServletRequest request, HttpServletResponse response,
+            Object result, String httpMethod, Method method)
             throws ServletException, IOException {
-        if (result instanceof ModelView) {
+
+        // Vérifier si la méthode est annotée @JSON
+        if (method != null && method.isAnnotationPresent(JSON.class)) {
+            System.out.println("JSON annotation detected for method: " + method.getName());
+            handleJsonResult(response, result);
+        } else if (result instanceof ModelView) {
             handleModelView(request, response, (ModelView) result);
         } else {
             handlePlainResult(response, result, httpMethod);
         }
+    }
+
+    /**
+     * Gère le résultat JSON
+     */
+    private void handleJsonResult(HttpServletResponse response, Object result) throws IOException {
+        response.setContentType("application/json;charset=UTF-8");
+        response.setCharacterEncoding("UTF-8");
+        PrintWriter writer = response.getWriter();
+
+        String json = jsonConverter.toJson(result);
+        System.out.println("Generated JSON: " + json); // Pour débogage
+        writer.print(json);
+        writer.flush();
     }
 
     private void handleModelView(HttpServletRequest request, HttpServletResponse response, ModelView mv)
@@ -70,7 +92,7 @@ public class ResponseHandler {
     public void send404(HttpServletResponse response, String path, Map<String, UrlInfo> urlMap)
             throws IOException {
         PrintWriter writer = response.getWriter();
-        
+
         writer.println("<!DOCTYPE html><html><body>");
         writer.println("<h1>Erreur 404 - Page non trouvée</h1>");
         writer.println("<p>Ressource introuvable : " + path + "</p>");
@@ -85,7 +107,7 @@ public class ResponseHandler {
     public void send405(HttpServletResponse response, String httpMethod, String path, UrlInfo urlInfo)
             throws IOException {
         PrintWriter writer = response.getWriter();
-        
+
         writer.println("<!DOCTYPE html><html><body>");
         writer.println("<h1>Erreur 405 - Méthode non autorisée</h1>");
         writer.println("<p>La méthode HTTP " + httpMethod + " n'est pas supportée pour l'URL : " + path + "</p>");
@@ -104,20 +126,20 @@ public class ResponseHandler {
 
     private void printAvailableUrls(PrintWriter writer, Map<String, UrlInfo> urlMap) {
         writer.println("<h2>URLs disponibles :</h2><ul>");
-        
+
         for (Map.Entry<String, UrlInfo> entry : urlMap.entrySet()) {
             UrlInfo info = entry.getValue();
             writer.println("<li><strong>" + entry.getKey() + "</strong>");
             writer.println("<ul>");
-            
+
             for (Map.Entry<String, Method> methodEntry : info.getMethods().entrySet()) {
                 writer.println("<li>[" + methodEntry.getKey() + "] -> " +
                         info.getClassName() + "." + methodEntry.getValue().getName() + "</li>");
             }
-            
+
             writer.println("</ul></li>");
         }
-        
+
         writer.println("</ul>");
     }
 }

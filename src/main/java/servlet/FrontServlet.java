@@ -9,31 +9,34 @@ import java.util.Map;
 
 import service.*;
 import annotation.*;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.*;
 
+@MultipartConfig
 public class FrontServlet extends HttpServlet {
 
     private Map<String, UrlInfo> urlMap;
     private ParameterMapper parameterMapper;
     private ResponseHandler responseHandler;
+    private FileHandler fileHandler;
 
     @Override
     public void init() throws ServletException {
         urlMap = new HashMap<>();
         parameterMapper = new ParameterMapper();
         responseHandler = new ResponseHandler(this);
-        
+        fileHandler = new FileHandler();
+
         initializeControllers();
     }
 
     private void initializeControllers() {
         try {
             List<Class<?>> classAnnotated = ScanController.findAllClassesWithAnnotation(
-                getServletContext(), 
-                Controller.class
-            );
+                    getServletContext(),
+                    Controller.class);
 
             for (Class<?> clazz : classAnnotated) {
                 List<UrlInfo> methods = Utils.findMethodsAnnotatedWithGetUrl(clazz);
@@ -83,10 +86,10 @@ public class FrontServlet extends HttpServlet {
         return request.getRequestURI().substring(request.getContextPath().length());
     }
 
-    private void handleMappedUrl(HttpServletRequest request, HttpServletResponse response, 
-                                  String httpMethod, String path, UrlMatcher.MatchResult matchResult)
+    private void handleMappedUrl(HttpServletRequest request, HttpServletResponse response,
+            String httpMethod, String path, UrlMatcher.MatchResult matchResult)
             throws ServletException, IOException {
-        
+
         UrlInfo urlInfo = matchResult.getUrlInfo();
         Map<String, String> urlParameters = matchResult.getParameters();
         Method urlMethod = urlInfo.getMethod(httpMethod);
@@ -100,15 +103,40 @@ public class FrontServlet extends HttpServlet {
     }
 
     private void invokeControllerMethod(HttpServletRequest request, HttpServletResponse response,
-                                        String httpMethod, UrlInfo urlInfo, Method urlMethod,
-                                        Map<String, String> urlParameters)
+            String httpMethod, UrlInfo urlInfo, Method urlMethod,
+            Map<String, String> urlParameters)
             throws ServletException, IOException {
         try {
+            System.out.println("=== Invoking Controller Method ===");
+            System.out.println("URL: " + urlInfo.getURL());
+            System.out.println("HTTP Method: " + httpMethod);
+            System.out.println("Controller Method: " + urlMethod);
+            System.out.println(
+                    "Has @JSON annotation: " + (urlMethod != null && urlMethod.isAnnotationPresent(JSON.class)));
+
+            // Vérifier et extraire les fichiers uploadés
+            Map<String, byte[]> uploadedFiles = new HashMap<>();
+            try {
+                uploadedFiles = fileHandler.extractUploadedFiles(request);
+                
+                // Sauvegarder les fichiers si présents
+                if (!uploadedFiles.isEmpty()) {
+                    String uploadPath = getServletContext().getRealPath("/WEB-INF/uploads");
+                    fileHandler.saveAllFiles(uploadPath, uploadedFiles);
+                    System.out.println("Nombre de fichiers uploadés: " + uploadedFiles.size());
+                }
+            } catch (Exception e) {
+                System.out.println("Aucun fichier uploadé ou erreur: " + e.getMessage());
+            }
+
             Object controllerInstance = createControllerInstance(urlInfo);
-            Object[] methodArgs = parameterMapper.prepareMethodArguments(urlMethod, request, urlParameters);
+            Object[] methodArgs = parameterMapper.prepareMethodArguments(urlMethod, request, 
+                                                                        urlParameters, uploadedFiles);
             Object result = urlMethod.invoke(controllerInstance, methodArgs);
 
-            responseHandler.handleResult(request, response, result, httpMethod);
+            System.out.println("Result type: " + (result != null ? result.getClass().getName() : "null"));
+
+            responseHandler.handleResult(request, response, result, httpMethod, urlMethod);
         } catch (Exception e) {
             e.printStackTrace();
             responseHandler.sendError(response, "Erreur lors de l'exécution de la méthode", e);

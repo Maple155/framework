@@ -9,13 +9,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import annotation.FileParam;
 import annotation.MapParam;
 import annotation.Param;
 import jakarta.servlet.http.HttpServletRequest;
 
 public class ParameterMapper {
 
-    
     private final TypeConverter typeConverter;
     private final ObjectBuilder objectBuilder;
 
@@ -25,7 +25,8 @@ public class ParameterMapper {
     }
 
     public Object[] prepareMethodArguments(Method method, HttpServletRequest request,
-                                          Map<String, String> urlParameters) {
+                                          Map<String, String> urlParameters,
+                                          Map<String, byte[]> uploadedFiles) {
         Parameter[] parameters = method.getParameters();
         Object[] args = new Object[parameters.length];
 
@@ -35,7 +36,8 @@ public class ParameterMapper {
             Parameter param = parameters[i];
             String paramName = getParameterName(param);
 
-            args[i] = resolveParameterValue(param, paramName, request, urlParameters, groupedParams);
+            args[i] = resolveParameterValue(param, paramName, request, urlParameters, 
+                                           groupedParams, uploadedFiles);
         }
         
         return args;
@@ -44,8 +46,11 @@ public class ParameterMapper {
     private Object resolveParameterValue(Parameter param, String paramName, 
                                         HttpServletRequest request,
                                         Map<String, String> urlParameters,
-                                        Map<String, Map<String, String>> groupedParams) {
-        if (param.isAnnotationPresent(MapParam.class)) {
+                                        Map<String, Map<String, String>> groupedParams,
+                                        Map<String, byte[]> uploadedFiles) {
+        if (param.isAnnotationPresent(FileParam.class)) {
+            return uploadedFiles;
+        } else if (param.isAnnotationPresent(MapParam.class)) {
             return buildMapParam(request);
         } else if (isComplexType(param.getType())) {
             return objectBuilder.buildFromParameters(param.getType(), paramName, groupedParams, request);

@@ -1,10 +1,7 @@
 package service;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.sql.Date;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,16 +9,19 @@ import java.util.Map;
 import annotation.FileParam;
 import annotation.MapParam;
 import annotation.Param;
+import annotation.Session;
 import jakarta.servlet.http.HttpServletRequest;
 
 public class ParameterMapper {
 
     private final TypeConverter typeConverter;
     private final ObjectBuilder objectBuilder;
+    private final SessionHandler sessionHandler;
 
     public ParameterMapper() {
         this.typeConverter = new TypeConverter();
         this.objectBuilder = new ObjectBuilder(typeConverter);
+        this.sessionHandler = new SessionHandler();
     }
 
     public Object[] prepareMethodArguments(Method method, HttpServletRequest request,
@@ -48,13 +48,26 @@ public class ParameterMapper {
                                         Map<String, String> urlParameters,
                                         Map<String, Map<String, String>> groupedParams,
                                         Map<String, byte[]> uploadedFiles) {
-        if (param.isAnnotationPresent(FileParam.class)) {
+        // Méthode 1 : @Session Map<String, Object>
+        if (param.isAnnotationPresent(Session.class)) {
+            return sessionHandler.extractSessionData(request);
+        }
+        // Méthode 2 : ModelView injecté avec session
+        else if (param.getType() == ModelView.class) {
+            ModelView modelView = new ModelView();
+            sessionHandler.injectSessionIntoModelView(request, modelView);
+            return modelView;
+        }
+        else if (param.isAnnotationPresent(FileParam.class)) {
             return uploadedFiles;
-        } else if (param.isAnnotationPresent(MapParam.class)) {
+        } 
+        else if (param.isAnnotationPresent(MapParam.class)) {
             return buildMapParam(request);
-        } else if (isComplexType(param.getType())) {
+        } 
+        else if (isComplexType(param.getType())) {
             return objectBuilder.buildFromParameters(param.getType(), paramName, groupedParams, request);
-        } else {
+        } 
+        else {
             String paramValue = getParameterValue(paramName, request, urlParameters);
             return typeConverter.convert(paramValue, param.getType());
         }
@@ -121,6 +134,7 @@ public class ParameterMapper {
             && type != Float.class 
             && type != Boolean.class 
             && type != Object.class
+            && type != ModelView.class
             && !type.isArray()
             && !List.class.isAssignableFrom(type)
             && !Map.class.isAssignableFrom(type);

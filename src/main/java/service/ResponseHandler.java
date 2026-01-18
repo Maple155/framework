@@ -16,15 +16,22 @@ public class ResponseHandler {
 
     private final HttpServlet servlet;
     private final JsonConverter jsonConverter;
+    private final SessionHandler sessionHandler;
 
     public ResponseHandler(HttpServlet servlet) {
         this.servlet = servlet;
         this.jsonConverter = new JsonConverter();
+        this.sessionHandler = new SessionHandler();
     }
 
     public void handleResult(HttpServletRequest request, HttpServletResponse response,
             Object result, String httpMethod, Method method)
             throws ServletException, IOException {
+
+        // Mettre à jour la session si le résultat est un ModelView
+        if (result instanceof ModelView) {
+            sessionHandler.updateSessionFromModelView(request, (ModelView) result);
+        }
 
         // Vérifier si la méthode est annotée @JSON
         if (method != null && method.isAnnotationPresent(JSON.class)) {
@@ -46,7 +53,7 @@ public class ResponseHandler {
         PrintWriter writer = response.getWriter();
 
         String json = jsonConverter.toJson(result);
-        System.out.println("Generated JSON: " + json); // Pour débogage
+        System.out.println("Generated JSON: " + json);
         writer.print(json);
         writer.flush();
     }

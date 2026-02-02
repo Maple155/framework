@@ -149,4 +149,15 @@ public class ResponseHandler {
 
         writer.println("</ul>");
     }
+
+    public void send403(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        PrintWriter writer = response.getWriter();
+        
+        writer.println("<!DOCTYPE html><html><body>");
+        writer.println("<h1>Erreur 403 - Accès interdit</h1>");
+        writer.println("<p>" + message + "</p>");
+        writer.println("<p><a href=\"/\">Retour à l'accueil</a></p>");
+        writer.println("</body></html>");
+    }
 }

@@ -21,6 +21,7 @@ public class FrontServlet extends HttpServlet {
     private ParameterMapper parameterMapper;
     private ResponseHandler responseHandler;
     private FileHandler fileHandler;
+    private AuthManager authManager;
 
     @Override
     public void init() throws ServletException {
@@ -28,6 +29,21 @@ public class FrontServlet extends HttpServlet {
         parameterMapper = new ParameterMapper();
         responseHandler = new ResponseHandler(this);
         fileHandler = new FileHandler();
+
+        // Initialiser l'AuthManager avec les paramètres du web.xml
+        String userSessionKey = getServletContext().getInitParameter("session.user.key");
+        String roleSessionKey = getServletContext().getInitParameter("session.role.key");
+        String loginPageUrl = getServletContext().getInitParameter("login.page.url");
+
+        // Valeurs par défaut si non définies dans web.xml
+        if (userSessionKey == null)
+            userSessionKey = "loggedUser";
+        if (roleSessionKey == null)
+            roleSessionKey = "userRoles";
+        if (loginPageUrl == null)
+            loginPageUrl = "/login";
+
+        authManager = new AuthManager(userSessionKey, roleSessionKey, loginPageUrl);
 
         initializeControllers();
     }
@@ -37,7 +53,6 @@ public class FrontServlet extends HttpServlet {
             List<Class<?>> classAnnotated = ScanController.findAllClassesWithAnnotation(
                     getServletContext(),
                     Controller.class);
-
             for (Class<?> clazz : classAnnotated) {
                 List<UrlInfo> methods = Utils.findMethodsAnnotatedWithGetUrl(clazz);
                 for (UrlInfo urlInfo : methods) {
@@ -99,6 +114,11 @@ public class FrontServlet extends HttpServlet {
             return;
         }
 
+        // Vérifier les annotations de sécurité
+        if (!checkSecurityAnnotations(request, response, urlMethod)) {
+            return; // Redirection ou erreur déjà gérée
+        }
+
         invokeControllerMethod(request, response, httpMethod, urlInfo, urlMethod, urlParameters);
     }
 
@@ -118,7 +138,7 @@ public class FrontServlet extends HttpServlet {
             Map<String, byte[]> uploadedFiles = new HashMap<>();
             try {
                 uploadedFiles = fileHandler.extractUploadedFiles(request);
-                
+
                 // Sauvegarder les fichiers si présents
                 if (!uploadedFiles.isEmpty()) {
                     String uploadPath = getServletContext().getRealPath("/WEB-INF/uploads");
@@ -130,8 +150,8 @@ public class FrontServlet extends HttpServlet {
             }
 
             Object controllerInstance = createControllerInstance(urlInfo);
-            Object[] methodArgs = parameterMapper.prepareMethodArguments(urlMethod, request, 
-                                                                        urlParameters, uploadedFiles);
+            Object[] methodArgs = parameterMapper.prepareMethodArguments(urlMethod, request,
+                    urlParameters, uploadedFiles);
             Object result = urlMethod.invoke(controllerInstance, methodArgs);
 
             System.out.println("Result type: " + (result != null ? result.getClass().getName() : "null"));
@@ -163,5 +183,38 @@ public class FrontServlet extends HttpServlet {
         if (defaultDispatcher != null) {
             defaultDispatcher.forward(request, response);
         }
+    }
+
+    private boolean checkSecurityAnnotations(HttpServletRequest request,
+            HttpServletResponse response,
+            Method method) throws IOException {
+
+        // Vérifier si la méthode est protégée
+        if (method.isAnnotationPresent(Protected.class)) {
+            if (!authManager.isAuthenticated(request)) {
+                authManager.redirectToLogin(request, response);
+                return false;
+            }
+        }
+
+        // Vérifier les rôles requis
+        if (method.isAnnotationPresent(Role.class)) {
+            Role roleAnnotation = method.getAnnotation(Role.class);
+            String[] requiredRoles = roleAnnotation.role();
+
+            // D'abord vérifier l'authentification
+            if (!authManager.isAuthenticated(request)) {
+                authManager.redirectToLogin(request, response);
+                return false;
+            }
+
+            // Ensuite vérifier les rôles
+            if (!authManager.hasRequiredRole(request, requiredRoles)) {
+                responseHandler.send403(response, "Accès interdit : rôles insuffisants");
+                return false;
+            }
+        }
+
+        return true;
     }
 }

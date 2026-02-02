@@ -4,5 +4,6 @@ import java.lang.annotation.*;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD})
-public @interface Controller {
+public @interface Role {
+    String[] role() default "";
 }
